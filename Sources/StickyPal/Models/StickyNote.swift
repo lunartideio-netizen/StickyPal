@@ -13,7 +13,7 @@ struct StickyNote: Codable, Identifiable, Sendable {
 
     init(
         content: String = "",
-        colorTag: String = "yellow",
+        colorTag: String = "gray",
         positionX: Double = 0,
         positionY: Double = 0,
         width: Double = 240,

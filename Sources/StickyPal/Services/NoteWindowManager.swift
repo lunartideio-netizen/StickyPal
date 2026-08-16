@@ -160,7 +160,7 @@ final class NoteWindowManager: ObservableObject {
         menu.addItem(.separator())
 
         // Color tags submenu
-        let currentTag = store.note(for: noteID)?.colorTag ?? "yellow"
+        let currentTag = store.note(for: noteID)?.colorTag ?? "gray"
         let colorMenu = NSMenu(title: "颜色标签")
         let colorTags: [(String, String)] = [
             ("黄色", "yellow"),
