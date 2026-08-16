@@ -163,15 +163,16 @@ final class NoteWindowManager: ObservableObject {
         let currentTag = store.note(for: noteID)?.colorTag ?? "yellow"
         let colorMenu = NSMenu(title: "颜色标签")
         let colorTags: [(String, String)] = [
-            ("🟡 黄色", "yellow"),
-            ("🔵 蓝色", "blue"),
-            ("🟢 绿色", "green"),
-            ("🌸 粉色", "pink"),
-            ("🟣 紫色", "purple"),
-            ("⚪️ 灰色", "gray"),
+            ("黄色", "yellow"),
+            ("蓝色", "blue"),
+            ("绿色", "green"),
+            ("粉色", "pink"),
+            ("紫色", "purple"),
+            ("灰色", "gray"),
         ]
         for (label, value) in colorTags {
             let item = NSMenuItem(title: label, action: #selector(MenuActionHandler.setColor(_:)), keyEquivalent: "")
+            item.image = NoteColors.makeDotImage(for: value)
             item.representedObject = value
             if value == currentTag {
                 item.state = .on

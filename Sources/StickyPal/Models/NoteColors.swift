@@ -37,4 +37,29 @@ enum NoteColors {
             return .clear
         }
     }
+
+    static func makeDotImage(for tag: String, size: CGFloat = 12) -> NSImage {
+        let image = NSImage(size: NSSize(width: size, height: size))
+        image.lockFocus()
+        let dotColor: NSColor
+        switch tag {
+        case "yellow":
+            dotColor = NSColor.systemYellow
+        case "blue":
+            dotColor = NSColor.systemBlue
+        case "green":
+            dotColor = NSColor.systemGreen
+        case "pink":
+            dotColor = NSColor.systemPink
+        case "purple":
+            dotColor = NSColor.systemPurple
+        default:
+            dotColor = NSColor.systemGray
+        }
+        let path = NSBezierPath(ovalIn: NSRect(x: 1, y: 1, width: size - 2, height: size - 2))
+        dotColor.setFill()
+        path.fill()
+        image.unlockFocus()
+        return image
+    }
 }
