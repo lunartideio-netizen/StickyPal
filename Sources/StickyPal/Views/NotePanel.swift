@@ -4,6 +4,7 @@ import SwiftUI
 final class NotePanel: NSPanel, NSWindowDelegate {
 
     var onDeleteRequested: (() -> Void)?
+    private let tintView = NSView()
 
     init(contentRect: NSRect) {
         super.init(
@@ -51,12 +52,29 @@ final class NotePanel: NSPanel, NSWindowDelegate {
         visualEffect.layer?.masksToBounds = true
         visualEffect.autoresizingMask = [.width, .height]
 
+        // Color tag tint layer
+        tintView.frame = visualEffect.bounds
+        tintView.wantsLayer = true
+        tintView.layer?.cornerRadius = 14
+        tintView.layer?.cornerCurve = .continuous
+        tintView.autoresizingMask = [.width, .height]
+        visualEffect.addSubview(tintView)
+
         contentView = visualEffect
         delegate = self
     }
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    func applyColorTag(_ tag: String) {
+        let targetColor = NoteColors.color(for: tag)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.25
+            context.allowsImplicitAnimation = true
+            tintView.layer?.backgroundColor = targetColor.cgColor
+        }
+    }
 
     // MARK: - NSWindowDelegate
 
@@ -70,4 +88,3 @@ final class NotePanel: NSPanel, NSWindowDelegate {
         super.close()
     }
 }
-

@@ -89,6 +89,9 @@ final class NoteWindowManager: ObservableObject {
         let panel = NotePanel(contentRect: rect)
         let noteID = note.id
 
+        // Apply initial color tag
+        panel.applyColorTag(note.colorTag)
+
         // Red traffic light button deletes note
         panel.onDeleteRequested = { [weak self] in
             self?.deleteNote(id: noteID)
@@ -139,6 +142,13 @@ final class NoteWindowManager: ObservableObject {
         }
 
         panels[noteID] = panel
+    }
+
+    func setColor(_ color: String, for noteID: UUID) {
+        store.update(id: noteID) { n in
+            n.colorTag = color
+        }
+        panels[noteID]?.applyColorTag(color)
     }
 
     func buildContextMenu(for noteID: UUID) -> NSMenu {
@@ -239,9 +249,6 @@ final class MenuActionHandler: NSObject {
 
     @objc func setColor(_ sender: NSMenuItem) {
         guard let value = sender.representedObject as? String else { return }
-        manager?.store.update(id: noteID) { n in
-            n.colorTag = value
-        }
+        manager?.setColor(value, for: noteID)
     }
 }
-
