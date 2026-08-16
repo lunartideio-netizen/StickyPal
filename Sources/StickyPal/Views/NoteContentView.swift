@@ -5,33 +5,34 @@ struct NoteContentView: View {
     let store: NoteStore
     let onContextMenu: () -> NSMenu?
 
-    @State private var content: String = ""
     @State private var saveTask: Task<Void, Never>?
+
+    private var currentNote: StickyNote? {
+        store.note(for: noteID)
+    }
 
     var body: some View {
         NoteTextEditorView(
-            text: $content,
+            plainContent: currentNote?.content ?? "",
+            rtfdDataBase64: currentNote?.rtfdDataBase64,
             onContextMenu: onContextMenu,
-            onTextChange: { newText in
-                debouncedSave(newText)
+            onContentChange: { plain, rtfd in
+                debouncedSave(plain: plain, rtfd: rtfd)
             }
         )
-        .onAppear {
-            content = store.note(for: noteID)?.content ?? ""
-        }
     }
 
-    private func debouncedSave(_ newValue: String) {
+    private func debouncedSave(plain: String, rtfd: String?) {
         saveTask?.cancel()
         saveTask = Task {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 store.update(id: noteID) { n in
-                    n.content = newValue
+                    n.content = plain
+                    n.rtfdDataBase64 = rtfd
                 }
             }
         }
     }
 }
-
