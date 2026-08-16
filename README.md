@@ -28,6 +28,7 @@
 - 🖼️ **图片与图文混排**：支持剪贴板截图直接粘贴（⌘V）、Finder 文件拖拽放入、大图按便签宽度自动等比缩放。
 - 🎚️ **透明度调节**：支持 100%、85%、70%、55% 多档半透明度微调。
 - 🔒 **本地优先与自启**：纯本地 RTFD / JSON 存储，数据完全在本地，支持开机自启。
+- 🎨 **官方原生应用图标**：精心设计的 macOS 连续曲率磨砂 Squircle 质感 App 图标与 Retina 适配。
 
 ---
 
@@ -48,7 +49,7 @@
 
 ### 方式一：直接下载使用（推荐）
 
-1. 前往 [Releases](https://github.com/lunartideio-netizen/StickyPal/releases) 页面下载最新版 `StickyPal-v1.2.0.zip`。
+1. 前往 [Releases](https://github.com/lunartideio-netizen/StickyPal/releases) 页面下载最新版 `StickyPal-v1.2.1.zip`。
 2. 解压后将 `StickyPal.app` 拖入 `/Applications`（应用程序）文件夹。
 3. 双击打开即可随时使用 **⌥ + Space** 唤出便签！
 
