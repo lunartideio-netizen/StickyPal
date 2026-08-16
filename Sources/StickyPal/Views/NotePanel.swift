@@ -4,7 +4,14 @@ import SwiftUI
 final class NotePanel: NSPanel, NSWindowDelegate {
 
     var onDeleteRequested: (() -> Void)?
+    var onCollapseToggled: ((Bool) -> Void)?
+    var isCollapsed: Bool = false
+    private var savedExpandedHeight: CGFloat = 180
+
+    private let containerView = NSView()
+    private let visualEffect = NSVisualEffectView()
     private let tintView = NSView()
+    private let shaderView = MetalShaderBackgroundView()
 
     init(contentRect: NSRect) {
         super.init(
@@ -41,8 +48,16 @@ final class NotePanel: NSPanel, NSWindowDelegate {
         // Minimum and reasonable default sizes
         minSize = NSSize(width: 180, height: 140)
 
-        // Frosted glass background with smooth Apple continuous rounded corners
-        let visualEffect = NSVisualEffectView(frame: contentRect)
+        // Container view
+        containerView.frame = contentRect
+        containerView.wantsLayer = true
+        containerView.layer?.cornerRadius = 14
+        containerView.layer?.cornerCurve = .continuous
+        containerView.layer?.masksToBounds = true
+        containerView.autoresizingMask = [.width, .height]
+
+        // 1. Frosted glass background for classic mode
+        visualEffect.frame = containerView.bounds
         visualEffect.material = .popover
         visualEffect.blendingMode = .behindWindow
         visualEffect.state = .active
@@ -51,16 +66,21 @@ final class NotePanel: NSPanel, NSWindowDelegate {
         visualEffect.layer?.cornerCurve = .continuous
         visualEffect.layer?.masksToBounds = true
         visualEffect.autoresizingMask = [.width, .height]
+        containerView.addSubview(visualEffect)
 
-        // Color tag tint layer
-        tintView.frame = visualEffect.bounds
+        // 2. Color tag tint layer
+        tintView.frame = containerView.bounds
         tintView.wantsLayer = true
         tintView.layer?.cornerRadius = 14
         tintView.layer?.cornerCurve = .continuous
         tintView.autoresizingMask = [.width, .height]
-        visualEffect.addSubview(tintView)
+        containerView.addSubview(tintView)
 
-        contentView = visualEffect
+        // 3. Dynamic Metal shader background layer
+        shaderView.frame = containerView.bounds
+        containerView.addSubview(shaderView)
+
+        contentView = containerView
         delegate = self
     }
 
@@ -74,6 +94,64 @@ final class NotePanel: NSPanel, NSWindowDelegate {
             context.allowsImplicitAnimation = true
             tintView.layer?.backgroundColor = targetColor.cgColor
         }
+    }
+
+    func applyTheme(_ theme: String) {
+        if theme == "classic" {
+            visualEffect.isHidden = false
+            tintView.isHidden = false
+        } else {
+            visualEffect.isHidden = true
+            tintView.isHidden = true
+        }
+        shaderView.applyTheme(theme)
+    }
+
+    func captureLiveFrame(size: CGSize) -> CGImage? {
+        shaderView.captureCurrentFrame(size: size)
+    }
+
+    func applyOpacity(_ opacity: Double) {
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            self.alphaValue = CGFloat(opacity)
+        }
+    }
+
+    func applyCollapse(_ collapsed: Bool, animated: Bool = true) {
+        guard self.isCollapsed != collapsed else { return }
+        self.isCollapsed = collapsed
+
+        let curFrame = self.frame
+        if collapsed {
+            savedExpandedHeight = max(140, curFrame.height)
+            let targetY = curFrame.origin.y + (curFrame.height - 36)
+            let targetFrame = NSRect(x: curFrame.origin.x, y: targetY, width: curFrame.width, height: 36)
+            self.minSize = NSSize(width: 180, height: 36)
+            self.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: 36)
+            self.setFrame(targetFrame, display: true, animate: animated)
+        } else {
+            let targetHeight = max(140, savedExpandedHeight)
+            let targetY = curFrame.origin.y - (targetHeight - 36)
+            let targetFrame = NSRect(x: curFrame.origin.x, y: targetY, width: curFrame.width, height: targetHeight)
+            self.minSize = NSSize(width: 180, height: 140)
+            self.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            self.setFrame(targetFrame, display: true, animate: animated)
+        }
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown && event.clickCount == 2 {
+            let point = event.locationInWindow
+            // Double click in top bar area (above text or on header)
+            if point.y >= self.frame.height - 36 {
+                let newState = !isCollapsed
+                applyCollapse(newState, animated: true)
+                onCollapseToggled?(newState)
+                return
+            }
+        }
+        super.sendEvent(event)
     }
 
     // MARK: - NSWindowDelegate

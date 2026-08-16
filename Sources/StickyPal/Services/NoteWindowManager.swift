@@ -92,6 +92,16 @@ final class NoteWindowManager: ObservableObject {
         // Apply initial color tag
         panel.applyColorTag(note.colorTag)
 
+        // Apply initial theme mode
+        panel.applyTheme(note.themeMode)
+
+        // Apply initial opacity & collapse
+        panel.applyOpacity(note.opacity)
+        panel.applyCollapse(note.isCollapsed, animated: false)
+        panel.onCollapseToggled = { [weak self] collapsed in
+            self?.store.update(id: noteID) { $0.isCollapsed = collapsed }
+        }
+
         // Red traffic light button deletes note
         panel.onDeleteRequested = { [weak self] in
             self?.deleteNote(id: noteID)
@@ -120,10 +130,7 @@ final class NoteWindowManager: ObservableObject {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.store.update(id: noteID) { n in
-                    n.positionX = panel.frame.origin.x
-                    n.positionY = panel.frame.origin.y
-                }
+                self?.handleWindowMove(panel: panel, noteID: noteID)
             }
         }
 
@@ -151,6 +158,74 @@ final class NoteWindowManager: ObservableObject {
         panels[noteID]?.applyColorTag(color)
     }
 
+    func setTheme(_ theme: String, for noteID: UUID) {
+        store.update(id: noteID) { n in
+            n.themeMode = theme
+        }
+        panels[noteID]?.applyTheme(theme)
+    }
+
+    func setOpacity(_ opacity: Double, for noteID: UUID) {
+        store.update(id: noteID) { n in
+            n.opacity = opacity
+        }
+        panels[noteID]?.applyOpacity(opacity)
+    }
+
+    func copyCardImage(for noteID: UUID) {
+        guard let note = store.note(for: noteID) else { return }
+        let panel = panels[noteID]
+        var attrString: NSAttributedString? = nil
+        if let base64 = note.rtfdDataBase64, let data = Data(base64Encoded: base64) {
+            attrString = NSAttributedString(rtfd: data, documentAttributes: nil)
+        }
+        _ = NoteCardExporter.copyCardToClipboard(panel: panel, note: note, attrString: attrString)
+    }
+
+    func saveCardImage(for noteID: UUID) {
+        guard let note = store.note(for: noteID) else { return }
+        let panel = panels[noteID]
+        var attrString: NSAttributedString? = nil
+        if let base64 = note.rtfdDataBase64, let data = Data(base64Encoded: base64) {
+            attrString = NSAttributedString(rtfd: data, documentAttributes: nil)
+        }
+        _ = NoteCardExporter.saveCardToDesktop(panel: panel, note: note, attrString: attrString)
+    }
+
+    private func handleWindowMove(panel: NotePanel, noteID: UUID) {
+        let snapped = calculateSnappedOrigin(for: panel)
+        if snapped != panel.frame.origin {
+            panel.setFrameOrigin(snapped)
+        }
+        store.update(id: noteID) { n in
+            n.positionX = panel.frame.origin.x
+            n.positionY = panel.frame.origin.y
+        }
+    }
+
+    private func calculateSnappedOrigin(for panel: NotePanel) -> NSPoint {
+        guard let screen = panel.screen ?? NSScreen.main else { return panel.frame.origin }
+        let sFrame = screen.visibleFrame
+        var origin = panel.frame.origin
+        let snapDist: CGFloat = 14.0
+
+        // Snap to screen edges
+        if abs(origin.x - sFrame.minX) <= snapDist { origin.x = sFrame.minX }
+        if abs(origin.x + panel.frame.width - sFrame.maxX) <= snapDist { origin.x = sFrame.maxX - panel.frame.width }
+        if abs(origin.y + panel.frame.height - sFrame.maxY) <= snapDist { origin.y = sFrame.maxY - panel.frame.height }
+        if abs(origin.y - sFrame.minY) <= snapDist { origin.y = sFrame.minY }
+
+        // Snap to other panels
+        for other in panels.values where other !== panel {
+            let oFrame = other.frame
+            if abs(origin.x - (oFrame.maxX + 8)) <= snapDist { origin.x = oFrame.maxX + 8 }
+            if abs(origin.x + panel.frame.width - (oFrame.minX - 8)) <= snapDist { origin.x = oFrame.minX - 8 - panel.frame.width }
+            if abs(origin.y + panel.frame.height - (oFrame.origin.y + oFrame.height)) <= snapDist { origin.y = oFrame.origin.y + oFrame.height - panel.frame.height }
+            if abs(origin.y - oFrame.origin.y) <= snapDist { origin.y = oFrame.origin.y }
+        }
+        return origin
+    }
+
     func buildContextMenu(for noteID: UUID) -> NSMenu {
         let menu = NSMenu(title: "便签操作")
 
@@ -158,6 +233,29 @@ final class NoteWindowManager: ObservableObject {
         menu.addItem(newItem)
 
         menu.addItem(.separator())
+
+        // Theme modes submenu
+        let currentTheme = store.note(for: noteID)?.themeMode ?? "classic"
+        let themeMenu = NSMenu(title: "主题模式")
+        let themeOptions: [(String, String)] = [
+            ("经典磨砂", "classic"),
+            ("流光渐变", "fluid"),
+            ("极光流转", "aurora"),
+            ("丝绸银铬", "chrome"),
+            ("暗黑霓虹", "neon"),
+            ("克莱因蓝", "klein"),
+        ]
+        for (label, value) in themeOptions {
+            let item = NSMenuItem(title: label, action: #selector(MenuActionHandler.setTheme(_:)), keyEquivalent: "")
+            item.representedObject = value
+            if value == currentTheme {
+                item.state = .on
+            }
+            themeMenu.addItem(item)
+        }
+        let themeItem = NSMenuItem(title: "主题模式", action: nil, keyEquivalent: "")
+        themeItem.submenu = themeMenu
+        menu.addItem(themeItem)
 
         // Color tags submenu
         let currentTag = store.note(for: noteID)?.colorTag ?? "gray"
@@ -182,6 +280,36 @@ final class NoteWindowManager: ObservableObject {
         let colorItem = NSMenuItem(title: "颜色标签", action: nil, keyEquivalent: "")
         colorItem.submenu = colorMenu
         menu.addItem(colorItem)
+
+        // Opacity submenu
+        let currentOpacity = store.note(for: noteID)?.opacity ?? 1.0
+        let opacityMenu = NSMenu(title: "透明度")
+        let opacityOptions: [(String, Double)] = [
+            ("100%", 1.0),
+            ("85%", 0.85),
+            ("70%", 0.70),
+            ("55%", 0.55),
+        ]
+        for (label, value) in opacityOptions {
+            let item = NSMenuItem(title: label, action: #selector(MenuActionHandler.setOpacity(_:)), keyEquivalent: "")
+            item.representedObject = value
+            if abs(value - currentOpacity) < 0.05 {
+                item.state = .on
+            }
+            opacityMenu.addItem(item)
+        }
+        let opacityItem = NSMenuItem(title: "透明度", action: nil, keyEquivalent: "")
+        opacityItem.submenu = opacityMenu
+        menu.addItem(opacityItem)
+
+        menu.addItem(.separator())
+
+        // Export card actions
+        let copyCardItem = NSMenuItem(title: "复制卡片图片", action: #selector(MenuActionHandler.copyCard), keyEquivalent: "C")
+        copyCardItem.keyEquivalentModifierMask = [.command, .shift]
+        let saveCardItem = NSMenuItem(title: "保存卡片到桌面", action: #selector(MenuActionHandler.saveCard), keyEquivalent: "")
+        menu.addItem(copyCardItem)
+        menu.addItem(saveCardItem)
 
         menu.addItem(.separator())
 
@@ -216,8 +344,16 @@ final class NoteWindowManager: ObservableObject {
         newItem.target = handler
         hideItem.target = handler
         deleteItem.target = handler
+        copyCardItem.target = handler
+        saveCardItem.target = handler
 
         for item in colorMenu.items {
+            item.target = handler
+        }
+        for item in themeMenu.items {
+            item.target = handler
+        }
+        for item in opacityMenu.items {
             item.target = handler
         }
 
@@ -251,5 +387,23 @@ final class MenuActionHandler: NSObject {
     @objc func setColor(_ sender: NSMenuItem) {
         guard let value = sender.representedObject as? String else { return }
         manager?.setColor(value, for: noteID)
+    }
+
+    @objc func setTheme(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? String else { return }
+        manager?.setTheme(value, for: noteID)
+    }
+
+    @objc func setOpacity(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? Double else { return }
+        manager?.setOpacity(value, for: noteID)
+    }
+
+    @objc func copyCard() {
+        manager?.copyCardImage(for: noteID)
+    }
+
+    @objc func saveCard() {
+        manager?.saveCardImage(for: noteID)
     }
 }

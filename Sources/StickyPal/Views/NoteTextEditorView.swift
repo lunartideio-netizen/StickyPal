@@ -137,8 +137,9 @@ struct NoteTextEditorView: NSViewRepresentable {
         textView.autoresizingMask = [.width]
         textView.drawsBackground = false
         textView.backgroundColor = .clear
-        textView.font = .systemFont(ofSize: 13, weight: .regular)
+        textView.font = .systemFont(ofSize: 13.5, weight: .regular)
         textView.textColor = .labelColor
+        textView.insertionPointColor = .labelColor
         textView.isRichText = true
         textView.importsGraphics = true
         textView.allowsImageEditing = true
